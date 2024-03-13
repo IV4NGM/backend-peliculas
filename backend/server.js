@@ -11,12 +11,10 @@ require('module-alias').addAlias('@', aliasPath)
 
 // Importar archivos
 const connectDB = require('@/config/db')
-// const { errorHandler } = require('@/middleware/errorMiddleware')
+const { errorHandler } = require('@/middleware/errorMiddleware')
 
 // Importar rutas
-// const usersRoutes = require('@/routes/usersRoutes')
-// const productsRoutes = require('@/routes/productsRoutes')
-// const salesRoutes = require('@/routes/salesRoutes')
+const usersRoutes = require('@/routes/usersRoutes')
 
 // Establecer puerto
 const port = process.env.PORT || 5000
@@ -32,12 +30,10 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 
 // Usar rutas
-// app.use('/api/users', usersRoutes)
-// app.use('/api/products', productsRoutes)
-// app.use('/api/sales', salesRoutes)
+app.use('/api/users', usersRoutes)
 
 // Usar middleware de manejo de errores
-// app.use(errorHandler)
+app.use(errorHandler)
 
 // Iniciar servidor
 app.listen(port, () => { console.log(`Servidor iniciado en el puerto ${port}`) })
