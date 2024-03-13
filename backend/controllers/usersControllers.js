@@ -1,8 +1,13 @@
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
+const crypto = require('crypto')
 const asyncHandler = require('express-async-handler')
 
+// Importar servicios de email
+const sendEmail = require('@/utils/email')
+
 const User = require('@/models/usersModel')
+const VerifyUserToken = require('@/models/verifyUserTokenModel')
 
 const createUser = asyncHandler(async (req, res) => {
   const { name, email, password, isAdmin } = req.body
@@ -18,6 +23,8 @@ const createUser = asyncHandler(async (req, res) => {
   const salt = await bcrypt.genSalt(10)
   const hashedPassword = await bcrypt.hash(password, salt)
 
+  let userRegistered
+
   // Verificar que el email no esté registrado
   const userExists = await User.findOne({ email })
   if (userExists) {
@@ -25,7 +32,7 @@ const createUser = asyncHandler(async (req, res) => {
       res.status(400)
       throw new Error('El email ya está registrado en la base de datos')
     } else {
-      const userUpdated = await User.findByIdAndUpdate(userExists.id, {
+      userRegistered = await User.findByIdAndUpdate(userExists.id, {
         name,
         email,
         password: hashedPassword,
@@ -35,40 +42,55 @@ const createUser = asyncHandler(async (req, res) => {
         tokenVersion: userExists.tokenVersion + 1
       }, { new: true })
 
-      if (userUpdated) {
-        res.status(201).json({
-          _id: userUpdated.id,
-          name: userUpdated.name,
-          email: userUpdated.email,
-          isVerified: userUpdated.isVerified,
-          isAdmin: userUpdated.isAdmin
-        })
-      } else {
+      if (!userRegistered) {
         res.status(400)
         throw new Error('No se pudieron guardar los datos')
       }
     }
   } else {
     // Crear el usuario
-    const userCreated = await User.create({
+    userRegistered = await User.create({
       name,
       email,
       password: hashedPassword,
       isAdmin: admin
     })
 
-    if (userCreated) {
-      res.status(201).json({
-        _id: userCreated.id,
-        name: userCreated.name,
-        email: userCreated.email,
-        isVerified: userCreated.isVerified,
-        isAdmin: userCreated.isAdmin
-      })
-    } else {
+    if (!userRegistered) {
       res.status(400)
       throw new Error('No se pudieron guardar los datos')
     }
+  }
+  if (userRegistered) {
+    // Enviar email de verificación
+
+    // Eliminar los tokens si es que hay
+    await VerifyUserToken.deleteMany({ user: userRegistered })
+
+    // Crear token aleatorio y enviarlo al email
+    const verificationToken = crypto.randomBytes(16).toString('hex')
+
+    const salt = await bcrypt.genSalt(10)
+    const hashedToken = await bcrypt.hash(verificationToken, salt)
+
+    const isEmailSent = await sendEmail(userRegistered.email, 'verifyEmail', {
+      name: userRegistered.name,
+      link: process.env.EMAIL_BASE_URL + `api/users/verify/${userRegistered._id}/${verificationToken}`
+    })
+
+    await VerifyUserToken.create({
+      user: userRegistered,
+      token: hashedToken
+    })
+
+    res.status(201).json({
+      _id: userRegistered.id,
+      name: userRegistered.name,
+      email: userRegistered.email,
+      isVerified: userRegistered.isVerified,
+      isAdmin: userRegistered.isAdmin,
+      isVerificationEmailSent: isEmailSent
+    })
   }
 })
 
@@ -77,6 +99,97 @@ const generateToken = (userId, tokenVersion) => {
     expiresIn: '30d'
   })
 }
+
+const sendVerificationEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body
+  if (!email) {
+    res.status(400)
+    throw new Error('Debes ingresar el email')
+  }
+  const user = await User.findOne({ email })
+  if (!user || !user.isActive) {
+    res.status(400)
+    throw new Error('No existe el usuario en la base de datos')
+  }
+  if (user.isVerified) {
+    res.status(400)
+    throw new Error('El usuario ya se encuentra verificado')
+  }
+  // Enviar email de verificación
+
+  // Eliminar los tokens si es que hay
+  await VerifyUserToken.deleteMany({ user })
+
+  // Crear token aleatorio y enviarlo al email
+  const verificationToken = crypto.randomBytes(16).toString('hex')
+
+  const salt = await bcrypt.genSalt(10)
+  const hashedToken = await bcrypt.hash(verificationToken, salt)
+
+  const isEmailSent = await sendEmail(user.email, 'verifyEmail', {
+    name: user.name,
+    link: process.env.EMAIL_BASE_URL + `api/users/verify/${user._id}/${verificationToken}`
+  })
+
+  await VerifyUserToken.create({
+    user,
+    token: hashedToken
+  })
+
+  if (isEmailSent) {
+    res.status(200).json({ message: 'Se ha enviado el email' })
+  } else {
+    res.status(400)
+    throw new Error('No se pudo enviar el email')
+  }
+})
+
+const verifyUser = asyncHandler(async (req, res) => {
+  const { id, token } = req.params
+
+  try {
+    const user = await User.findById(id)
+
+    if (!user || !user.isActive) {
+      res.status(400)
+      throw new Error('Token inválido')
+    }
+    if (user && user.isVerified) {
+      res.status(400)
+      throw new Error('El usuario ya está verificado')
+    }
+
+    const userToken = await VerifyUserToken.findOne({ user: id })
+    if (!userToken || userToken.expiresAt < new Date() || !await bcrypt.compare(token, userToken.token)) {
+      res.status(400)
+      throw new Error('Token expirado o inválido')
+    }
+    const userUpdated = await User.findOneAndUpdate(user, {
+      isVerified: true
+    }, { new: true })
+    if (userUpdated) {
+      await VerifyUserToken.deleteMany({ user })
+      res.status(200).json({
+        _id: userUpdated.id,
+        name: userUpdated.name,
+        email: userUpdated.email,
+        isVerified: userUpdated.isVerified,
+        isAdmin: userUpdated.isAdmin
+      })
+    } else {
+      res.status(400)
+      throw new Error('No se pudo verificar el usuario')
+    }
+  } catch (error) {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      res.status(404)
+      throw new Error('El usuario no se encuentra en la base de datos')
+    } else {
+      res.status(res.statusCode || 400)
+      throw new Error(error.message || 'No se pudo verificar el usuario')
+    }
+  }
+})
 
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body
@@ -201,6 +314,8 @@ const deleteUser = asyncHandler(async (req, res) => {
 
 module.exports = {
   createUser,
+  sendVerificationEmail,
+  verifyUser,
   loginUser,
   getUser,
   getAllUsers,
