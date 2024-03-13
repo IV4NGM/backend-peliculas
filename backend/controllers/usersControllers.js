@@ -8,6 +8,7 @@ const sendEmail = require('@/utils/email')
 
 const User = require('@/models/usersModel')
 const VerifyUserToken = require('@/models/verifyUserTokenModel')
+const ResetPasswordToken = require('@/models/resetPasswordTokenModel')
 
 const createUser = asyncHandler(async (req, res) => {
   const { name, email, password, isAdmin } = req.body
@@ -73,14 +74,14 @@ const createUser = asyncHandler(async (req, res) => {
     const salt = await bcrypt.genSalt(10)
     const hashedToken = await bcrypt.hash(verificationToken, salt)
 
-    const isEmailSent = await sendEmail(userRegistered.email, 'verifyEmail', {
-      name: userRegistered.name,
-      link: process.env.EMAIL_BASE_URL + `api/users/verify/${userRegistered._id}/${verificationToken}`
-    })
-
     await VerifyUserToken.create({
       user: userRegistered,
       token: hashedToken
+    })
+
+    const isEmailSent = await sendEmail(userRegistered.email, 'verifyEmail', {
+      name: userRegistered.name,
+      link: process.env.EMAIL_BASE_URL + `/verify/${userRegistered._id}/${verificationToken}`
     })
 
     res.status(201).json({
@@ -126,14 +127,14 @@ const sendVerificationEmail = asyncHandler(async (req, res) => {
   const salt = await bcrypt.genSalt(10)
   const hashedToken = await bcrypt.hash(verificationToken, salt)
 
-  const isEmailSent = await sendEmail(user.email, 'verifyEmail', {
-    name: user.name,
-    link: process.env.EMAIL_BASE_URL + `api/users/verify/${user._id}/${verificationToken}`
-  })
-
   await VerifyUserToken.create({
     user,
     token: hashedToken
+  })
+
+  const isEmailSent = await sendEmail(user.email, 'verifyEmail', {
+    name: user.name,
+    link: process.env.EMAIL_BASE_URL + `/verify/${user._id}/${verificationToken}`
   })
 
   if (isEmailSent) {
@@ -145,7 +146,12 @@ const sendVerificationEmail = asyncHandler(async (req, res) => {
 })
 
 const verifyUser = asyncHandler(async (req, res) => {
-  const { id, token } = req.params
+  const { id, token } = req.body
+
+  if (!id || !token) {
+    res.status(400)
+    throw new Error('Debes ingresar todos los campos')
+  }
 
   try {
     const user = await User.findById(id)
@@ -187,6 +193,104 @@ const verifyUser = asyncHandler(async (req, res) => {
     } else {
       res.status(res.statusCode || 400)
       throw new Error(error.message || 'No se pudo verificar el usuario')
+    }
+  }
+})
+
+const sendResetEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body
+  if (!email) {
+    res.status(400)
+    throw new Error('Debes ingresar el email')
+  }
+  const user = await User.findOne({ email })
+  if (!user || !user.isActive) {
+    res.status(400)
+    throw new Error('No existe el usuario en la base de datos')
+  }
+
+  // Enviar email de reset password
+
+  // Eliminar los tokens si es que hay
+  await ResetPasswordToken.deleteMany({ user })
+
+  // Crear token aleatorio y enviarlo al email
+  const resetToken = crypto.randomBytes(16).toString('hex')
+
+  const salt = await bcrypt.genSalt(10)
+  const hashedToken = await bcrypt.hash(resetToken, salt)
+
+  const isEmailSent = await sendEmail(user.email, 'resetPassword', {
+    name: user.name,
+    link: process.env.EMAIL_BASE_URL + `/reset-password/${user._id}/${resetToken}`
+  })
+
+  await ResetPasswordToken.create({
+    user,
+    token: hashedToken
+  })
+
+  if (isEmailSent) {
+    res.status(200).json({ message: 'Se ha enviado el email' })
+  } else {
+    res.status(400)
+    throw new Error('No se pudo enviar el email')
+  }
+})
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { id, token, password } = req.body
+
+  if (!id || !token || !password) {
+    res.status(400)
+    throw new Error('Debes ingresar todos los campos')
+  }
+
+  try {
+    const user = await User.findById(id)
+
+    if (!user || !user.isActive) {
+      res.status(400)
+      throw new Error('Token inválido')
+    }
+
+    const userToken = await ResetPasswordToken.findOne({ user: id })
+
+    if (!userToken || userToken.expiresAt < new Date() || !await bcrypt.compare(token, userToken.token)) {
+      res.status(400)
+      throw new Error('Token expirado o inválido')
+    }
+
+    const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(password, salt)
+
+    const userUpdated = await User.findOneAndUpdate(user, {
+      password: hashedPassword,
+      tokenVersion: user.tokenVersion + 1
+    }, { new: true })
+    if (userUpdated) {
+      await sendEmail(user.email, 'resetPasswordConfirmation', {
+        name: user.name
+      })
+      await ResetPasswordToken.deleteMany({ user })
+      res.status(200).json({
+        _id: userUpdated.id,
+        name: userUpdated.name,
+        email: userUpdated.email,
+        isVerified: userUpdated.isVerified,
+        isAdmin: userUpdated.isAdmin
+      })
+    } else {
+      res.status(400)
+      throw new Error('No se pudo actualizar la contraseña')
+    }
+  } catch (error) {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      res.status(404)
+      throw new Error('El usuario no se encuentra en la base de datos')
+    } else {
+      res.status(res.statusCode || 400)
+      throw new Error(error.message || 'No se pudo actualizar la contraseña')
     }
   }
 })
@@ -327,6 +431,8 @@ module.exports = {
   createUser,
   sendVerificationEmail,
   verifyUser,
+  sendResetEmail,
+  resetPassword,
   loginUser,
   getUser,
   getAllUsers,

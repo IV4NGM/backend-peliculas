@@ -31,6 +31,9 @@ const sendEmail = async (email, template, context) => {
   if (template === 'resetPassword') {
     subject = 'Reset your password'
   }
+  if (template === 'resetPasswordConfirmation') {
+    subject = 'Password reseted successfully'
+  }
   try {
     const mailOptions = {
       from: process.env.EMAIL_USER,
