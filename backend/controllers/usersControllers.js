@@ -202,14 +202,25 @@ const loginUser = asyncHandler(async (req, res) => {
   // Verificamos si el usuario existe y también su password
   const user = await User.findOne({ email })
   if (user && user.isActive && (await bcrypt.compare(password, user.password))) {
-    res.status(200).json({
-      _id: user.id,
-      name: user.name,
-      email: user.email,
-      isVerified: user.isVerified,
-      isAdmin: user.isAdmin,
-      token: generateToken(user.id, user.tokenVersion)
-    })
+    // Generamos un token si y solo si el usuario está verificado
+    if (user.isVerified) {
+      res.status(200).json({
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified,
+        isAdmin: user.isAdmin,
+        token: generateToken(user.id, user.tokenVersion)
+      })
+    } else {
+      res.status(200).json({
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified,
+        isAdmin: user.isAdmin
+      })
+    }
   } else {
     res.status(400)
     throw new Error('Credenciales incorrectas')
