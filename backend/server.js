@@ -2,7 +2,6 @@ const express = require('express')
 require('colors')
 require('dotenv').config()
 const cors = require('cors')
-
 // Configurar alias
 const path = require('path')
 require('module-alias/register')
