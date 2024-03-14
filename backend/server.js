@@ -14,6 +14,7 @@ const { errorHandler } = require('@/middleware/errorMiddleware')
 
 // Importar rutas
 const usersRoutes = require('@/routes/usersRoutes')
+const moviesRoutes = require('@/routes/moviesRoutes')
 
 // Establecer puerto
 const port = process.env.PORT || 5000
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: false }))
 
 // Usar rutas
 app.use('/api/users', usersRoutes)
+app.use('/api/movies', moviesRoutes)
 
 // Usar middleware de manejo de errores
 app.use(errorHandler)
