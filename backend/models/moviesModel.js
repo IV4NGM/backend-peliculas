@@ -78,11 +78,4 @@ const movieSchema = mongoose.Schema({
   timestamps: true
 })
 
-movieSchema.virtual('genres', {
-  ref: 'Genre',
-  localField: 'genre_ids',
-  foreignField: 'genre_id',
-  justOne: false
-})
-
 module.exports = mongoose.model('Movie', movieSchema)
