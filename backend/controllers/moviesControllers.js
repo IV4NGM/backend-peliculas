@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler')
 
+const Genre = require('@/models/genresModel')
 const Movie = require('@/models/moviesModel')
 
 const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL
@@ -238,10 +239,32 @@ const dislikeMovie = asyncHandler(async (req, res) => {
   }
 })
 
+const createMovie = asyncHandler(async (req, res) => {
+  const movieData = req.body
+  const validGenres = await Genre.find({ isActive: true })
+  const validGenresIds = validGenres.map((genre) => genre.genre_id)
+  if (!movieData.genre_ids) {
+    res.status(400)
+    throw new Error('Debes ingresar al menos un género')
+  }
+  if (movieData.genre_ids.some((genreId) => !validGenresIds.includes(genreId))) {
+    res.status(400)
+    throw new Error('Debes ingresar géneros válidos')
+  }
+  const movieCreated = await Movie.create(movieData)
+  if (movieCreated) {
+    res.status(201).json(movieCreated)
+  } else {
+    res.status(400)
+    throw new Error('No se ha podido crear la película')
+  }
+})
+
 module.exports = {
   getAllMovies,
   getContextMovies,
   likeMovie,
   resetLikesMovie,
-  dislikeMovie
+  dislikeMovie,
+  createMovie
 }
