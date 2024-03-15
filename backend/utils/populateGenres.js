@@ -7,7 +7,7 @@ const Genre = require('../models/genresModel')
 
 connectDB()
 
-const URL = `${process.env.API_URL}/genre/movie/list?language=en&api_key=${process.env.API_KEY}`
+const URL = `${process.env.API_URL}/genre/movie/list?language=es&api_key=${process.env.API_KEY}`
 
 const getGenres = async () => {
   try {
