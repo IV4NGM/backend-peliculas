@@ -263,6 +263,7 @@ const dislikeMovie = asyncHandler(async (req, res) => {
 })
 
 const createMovie = asyncHandler(async (req, res) => {
+  const user = req.user
   const movieData = req.body
   const validGenres = await Genre.find({ isActive: true })
   const validGenresIds = validGenres.map((genre) => genre.genre_id)
@@ -276,7 +277,14 @@ const createMovie = asyncHandler(async (req, res) => {
   }
   const movieCreated = await Movie.create(movieData)
   if (movieCreated) {
-    res.status(201).json(movieCreated)
+    const updatedMovies = await structureMovies({ _id: movieCreated._id })
+
+    if (!updatedMovies) {
+      res.status(400)
+      throw new Error('No se pudo crear la película')
+    }
+    const cleanedMovie = await cleanMovieContext(user, updatedMovies[0])
+    res.status(201).json(cleanedMovie)
   } else {
     res.status(400)
     throw new Error('No se ha podido crear la película')
@@ -284,6 +292,7 @@ const createMovie = asyncHandler(async (req, res) => {
 })
 
 const updateMovie = asyncHandler(async (req, res) => {
+  const user = req.user
   const movieData = req.body
   const movieId = req.params.id
 
@@ -315,7 +324,7 @@ const updateMovie = asyncHandler(async (req, res) => {
       throw new Error('No se pudo actualizar la película')
     }
 
-    const cleanedMovie = await cleanMovie(updatedMovies[0])
+    const cleanedMovie = await cleanMovieContext(user, updatedMovies[0])
 
     res.status(200).json(cleanedMovie)
   } catch (error) {
@@ -346,7 +355,7 @@ const deleteMovie = asyncHandler(async (req, res) => {
       throw new Error('No se pudo eliminar la película')
     }
 
-    res.status(200).json({ id: movieId })
+    res.status(200).json({ _id: movieId })
   } catch (error) {
     if (error.name === 'CastError' && error.kind === 'ObjectId') {
       res.status(404)
