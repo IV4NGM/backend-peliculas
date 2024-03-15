@@ -31,8 +31,11 @@ const structureMovies = async (match) => {
 }
 
 const cleanMovie = async (movie) => {
-  movie.backdrop_path = IMAGE_BASE_URL + movie.backdrop_path
-  movie.poster_path = IMAGE_BASE_URL + movie.poster_path
+  if (movie.addURLPrefix) {
+    movie.backdrop_path = IMAGE_BASE_URL + movie.backdrop_path
+    movie.poster_path = IMAGE_BASE_URL + movie.poster_path
+  }
+  delete movie.addURLPrefix
   delete movie.genre_ids
   delete movie.users_likes
   delete movie.users_dislikes
@@ -40,8 +43,10 @@ const cleanMovie = async (movie) => {
 }
 
 const cleanMovieContext = async (user, movie) => {
-  movie.backdrop_path = IMAGE_BASE_URL + movie.backdrop_path
-  movie.poster_path = IMAGE_BASE_URL + movie.poster_path
+  if (movie.addURLPrefix) {
+    movie.backdrop_path = IMAGE_BASE_URL + movie.backdrop_path
+    movie.poster_path = IMAGE_BASE_URL + movie.poster_path
+  }
   movie.isLiked = 0
   const usersDislikesIds = movie.users_dislikes.map((user) => user._id.toString())
   if (usersDislikesIds.includes(user._id.toString())) {
@@ -51,11 +56,29 @@ const cleanMovieContext = async (user, movie) => {
   if (usersLikesIds.includes(user._id.toString())) {
     movie.isLiked = 1
   }
+  delete movie.addURLPrefix
   delete movie.genre_ids
   delete movie.users_likes
   delete movie.users_dislikes
   return movie
 }
+
+const getAllGenres = asyncHandler(async (req, res) => {
+  const genres = await Genre.find({ isActive: true })
+  if (genres) {
+    const genresCleaned = genres.map((genre) => {
+      return ({
+        _id: genre._id,
+        genre_id: genre.genre_id,
+        name: genre.name
+      })
+    })
+    res.status(200).json(genresCleaned)
+  } else {
+    res.status(400)
+    throw new Error('No se pudieron obtener los géneros')
+  }
+})
 
 const getAllMovies = asyncHandler(async (req, res) => {
   const movies = await structureMovies({ isActive: true })
@@ -260,11 +283,89 @@ const createMovie = asyncHandler(async (req, res) => {
   }
 })
 
+const updateMovie = asyncHandler(async (req, res) => {
+  const movieData = req.body
+  const movieId = req.params.id
+
+  try {
+    const movie = await Movie.findOne({ _id: movieId })
+    if (!movie) {
+      res.status(400)
+      throw new Error('La película no se encuentra en la base de datos')
+    }
+
+    const validGenres = await Genre.find({ isActive: true })
+    const validGenresIds = validGenres.map((genre) => genre.genre_id)
+    if (movieData.genre_ids && movieData.genre_ids.some((genreId) => !validGenresIds.includes(genreId))) {
+      res.status(400)
+      throw new Error('Debes ingresar géneros válidos')
+    }
+
+    const movieUpdated = await Movie.findOneAndUpdate(movie, movieData, { new: true })
+
+    if (!movieUpdated) {
+      res.status(400)
+      throw new Error('No se pudo actualizar la película')
+    }
+
+    const updatedMovies = await structureMovies({ _id: movieUpdated._id })
+
+    if (!updatedMovies) {
+      res.status(400)
+      throw new Error('No se pudo actualizar la película')
+    }
+
+    const cleanedMovie = await cleanMovie(updatedMovies[0])
+
+    res.status(200).json(cleanedMovie)
+  } catch (error) {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      res.status(404)
+      throw new Error('La película no se encuentra en la base de datos')
+    } else {
+      res.status(res.statusCode || 400)
+      throw new Error(error.message || 'No se pudo actualizar la película')
+    }
+  }
+})
+
+const deleteMovie = asyncHandler(async (req, res) => {
+  const movieId = req.params.id
+
+  try {
+    const movie = await Movie.findOne({ _id: movieId })
+    if (!movie || !movie.isActive) {
+      res.status(400)
+      throw new Error('La película no se encuentra en la base de datos')
+    }
+
+    const movieUpdated = await Movie.findOneAndUpdate(movie, { isActive: false }, { new: true })
+
+    if (!movieUpdated) {
+      res.status(400)
+      throw new Error('No se pudo eliminar la película')
+    }
+
+    res.status(200).json({ id: movieId })
+  } catch (error) {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      res.status(404)
+      throw new Error('La película no se encuentra en la base de datos')
+    } else {
+      res.status(res.statusCode || 400)
+      throw new Error(error.message || 'No se pudo eliminar la película')
+    }
+  }
+})
+
 module.exports = {
+  getAllGenres,
   getAllMovies,
   getContextMovies,
   likeMovie,
   resetLikesMovie,
   dislikeMovie,
-  createMovie
+  createMovie,
+  updateMovie,
+  deleteMovie
 }
