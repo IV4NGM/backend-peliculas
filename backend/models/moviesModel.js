@@ -70,6 +70,15 @@ const movieSchema = mongoose.Schema({
       }
     }
   ],
+  users_dislikes: [
+    {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: 'User'
+      }
+    }
+  ],
   isActive: {
     type: Boolean,
     default: true
