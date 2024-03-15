@@ -3,11 +3,11 @@ const mongoose = require('mongoose')
 const movieSchema = mongoose.Schema({
   adult: {
     type: Boolean,
-    required: true
+    default: false
   },
   backdrop_path: {
     type: String,
-    required: true
+    required: [true, 'Por favor, ingresa una imagen de fondo de la película']
   },
   genre_ids: [
     {
@@ -17,49 +17,44 @@ const movieSchema = mongoose.Schema({
     }
   ],
   movie_id: {
-    type: Number,
-    required: true,
-    unique: true
+    type: Number
   },
   original_language: {
     type: String,
-    required: true
+    required: [true, 'Por favor, ingresa el idioma de la película']
   },
   original_title: {
     type: String,
-    required: true
+    required: [true, 'Por favor, ingresa el título original de la película']
   },
   overview: {
     type: String,
-    required: true
+    required: [true, 'Por favor, ingresa la descripción de la película']
   },
   popularity: {
-    type: Number,
-    required: true
+    type: Number
   },
   poster_path: {
     type: String,
-    required: true
+    required: [true, 'Por favor, ingresa la imagen de poster de la película']
   },
   release_date: {
     type: Date,
-    required: true
+    required: [true, 'Por favor, ingresa la fecha de lanzamiento de la película']
   },
   title: {
     type: String,
-    required: true
+    required: [true, 'Por favor, ingresa el título de la película']
   },
   video: {
     type: Boolean,
-    required: true
+    default: false
   },
   vote_average: {
-    type: Number,
-    required: true
+    type: Number
   },
   vote_count: {
-    type: Number,
-    required: true
+    type: Number
   },
   users_likes: [
     {
@@ -79,6 +74,10 @@ const movieSchema = mongoose.Schema({
       }
     }
   ],
+  addURLPrefix: {
+    type: Boolean,
+    default: true
+  },
   isActive: {
     type: Boolean,
     default: true
