@@ -36,7 +36,7 @@ const movieSchema = mongoose.Schema({
   },
   poster_path: {
     type: String,
-    required: [true, 'Por favor, ingresa la imagen de poster de la película']
+    required: [true, 'Por favor, ingresa la imagen de póster de la película']
   },
   release_date: {
     type: Date,
