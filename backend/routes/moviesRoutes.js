@@ -1,12 +1,15 @@
 const { Router } = require('express')
 const router = Router()
 
-const { getAllGenres, getAllMovies, getContextMovies, likeMovie, resetLikesMovie, dislikeMovie, createMovie, updateMovie, deleteMovie } = require('@/controllers/moviesControllers')
+const { getAllGenres, getAllMovies, getContextMovies, getOneMovie, getOneMovieContext, likeMovie, resetLikesMovie, dislikeMovie, createMovie, updateMovie, deleteMovie } = require('@/controllers/moviesControllers')
 const { protect, adminProtect } = require('@/middleware/authMiddleware')
 
 router.get('/genres', getAllGenres)
 router.get('/', getAllMovies)
 router.get('/all', protect, getContextMovies)
+
+router.get('/:id', getOneMovie)
+router.get('/context/:id', protect, getOneMovieContext)
 
 // Dar like a una película
 router.get('/like/:id', protect, likeMovie)

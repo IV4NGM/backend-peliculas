@@ -103,6 +103,65 @@ const getContextMovies = asyncHandler(async (req, res) => {
   }
 })
 
+const getOneMovie = asyncHandler(async (req, res) => {
+  const movieId = req.params.id
+  try {
+    const movie = await Movie.findOne({ _id: movieId })
+    if (!movie || !movie.isActive) {
+      res.status(400)
+      throw new Error('La película no se encuentra en la base de datos')
+    }
+    const movieData = await structureMovies({ _id: movie._id })
+
+    if (!movieData) {
+      res.status(400)
+      throw new Error('No se pudo obtener la película')
+    }
+
+    const cleanedMovie = await cleanMovie(movieData[0])
+
+    res.status(200).json(cleanedMovie)
+  } catch (error) {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      res.status(404)
+      throw new Error('La película no se encuentra en la base de datos')
+    } else {
+      res.status(res.statusCode || 400)
+      throw new Error(error.message || 'No se pudo obtener la película')
+    }
+  }
+})
+
+const getOneMovieContext = asyncHandler(async (req, res) => {
+  const user = req.user
+  const movieId = req.params.id
+  try {
+    const movie = await Movie.findOne({ _id: movieId })
+    if (!movie || !movie.isActive) {
+      res.status(400)
+      throw new Error('La película no se encuentra en la base de datos')
+    }
+    const movieData = await structureMovies({ _id: movie._id })
+
+    if (!movieData) {
+      res.status(400)
+      throw new Error('No se pudo obtener la película')
+    }
+
+    const cleanedMovie = await cleanMovieContext(user, movieData[0])
+
+    res.status(200).json(cleanedMovie)
+  } catch (error) {
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      res.status(404)
+      throw new Error('La película no se encuentra en la base de datos')
+    } else {
+      res.status(res.statusCode || 400)
+      throw new Error(error.message || 'No se pudo obtener la película')
+    }
+  }
+})
+
 const likeMovie = asyncHandler(async (req, res) => {
   const user = req.user
   const movieId = req.params.id
@@ -371,6 +430,8 @@ module.exports = {
   getAllGenres,
   getAllMovies,
   getContextMovies,
+  getOneMovie,
+  getOneMovieContext,
   likeMovie,
   resetLikesMovie,
   dislikeMovie,
