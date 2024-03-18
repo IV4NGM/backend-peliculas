@@ -37,7 +37,10 @@ const sendEmail = async (email, template, context) => {
   }
   try {
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: {
+        name: process.env.EMAIL_USERNAME,
+        address: process.env.EMAIL_USER
+      },
       template,
       to: email,
       subject,
