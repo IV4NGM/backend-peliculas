@@ -25,16 +25,20 @@ const handlebarOptions = {
 transporter.use('compile', hbs(handlebarOptions))
 
 const sendEmail = async (email, template, context) => {
-  let subject = 'Notification from ivangmsystems'
+  let subject = 'Notificación de Eagle Blade'
   if (template === 'verifyEmail') {
-    subject = 'Verify your account'
+    subject = 'Verifica tu correo electrónico'
   }
   if (template === 'resetPassword') {
-    subject = 'Reset your password'
+    subject = 'Restablece tu contraseña'
   }
   if (template === 'resetPasswordConfirmation') {
-    subject = 'Password reseted successfully'
+    subject = 'Contraseña restablecida exitosamente'
   }
+  if (template === 'goodbye') {
+    subject = '¡No es un adiós, sino un hasta pronto!'
+  }
+  context.siteLink = process.env.EMAIL_BASE_URL
   try {
     const mailOptions = {
       from: {
@@ -44,7 +48,12 @@ const sendEmail = async (email, template, context) => {
       template,
       to: email,
       subject,
-      context
+      context,
+      attachments: [{
+        filename: 'eagle-icon.png',
+        path: path.resolve('backend/public/images/eagle-icon.png'),
+        cid: 'eagle-blade-icon@nodemailer.com'
+    }]
     }
     await transporter.sendMail(mailOptions)
     return true
