@@ -448,6 +448,9 @@ const deleteUser = asyncHandler(async (req, res) => {
   },
   { new: true })
   if (userDeleted) {
+    await sendEmail(userDeleted.email, 'goodbye', {
+      name: userDeleted.name
+    })
     res.status(200).json({ message: 'Usuario eliminado exitosamente' })
   } else {
     res.status(400)
