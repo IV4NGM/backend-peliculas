@@ -43,3 +43,5 @@ coverage
 benchmarks/graphs
 
 jsconfig.json
+
+email_tests
