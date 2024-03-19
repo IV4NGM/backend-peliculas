@@ -10,6 +10,12 @@ const User = require('@/models/usersModel')
 const VerifyUserToken = require('@/models/verifyUserTokenModel')
 const ResetPasswordToken = require('@/models/resetPasswordTokenModel')
 
+const generateToken = (userId, tokenVersion) => {
+  return jwt.sign({ user_id: userId, token_version: tokenVersion }, process.env.JWT_SECRET, {
+    expiresIn: '30d'
+  })
+}
+
 const createUser = asyncHandler(async (req, res) => {
   const { name, email, password, isAdmin } = req.body
 
@@ -90,16 +96,11 @@ const createUser = asyncHandler(async (req, res) => {
       email: userRegistered.email,
       isVerified: userRegistered.isVerified,
       isAdmin: userRegistered.isAdmin,
-      isVerificationEmailSent: isEmailSent
+      isVerificationEmailSent: isEmailSent,
+      token: generateToken(userRegistered.id, userRegistered.tokenVersion)
     })
   }
 })
-
-const generateToken = (userId, tokenVersion) => {
-  return jwt.sign({ user_id: userId, token_version: tokenVersion }, process.env.JWT_SECRET, {
-    expiresIn: '30d'
-  })
-}
 
 const sendVerificationEmail = asyncHandler(async (req, res) => {
   const { email } = req.body
@@ -171,7 +172,8 @@ const verifyUser = asyncHandler(async (req, res) => {
       throw new Error('Token expirado o inválido')
     }
     const userUpdated = await User.findOneAndUpdate(user, {
-      isVerified: true
+      isVerified: true,
+      tokenVersion: user.tokenVersion + 1
     }, { new: true })
     if (userUpdated) {
       await VerifyUserToken.deleteMany({ user })
@@ -180,7 +182,8 @@ const verifyUser = asyncHandler(async (req, res) => {
         name: userUpdated.name,
         email: userUpdated.email,
         isVerified: userUpdated.isVerified,
-        isAdmin: userUpdated.isAdmin
+        isAdmin: userUpdated.isAdmin,
+        token: generateToken(userUpdated.id, userUpdated.tokenVersion)
       })
     } else {
       res.status(400)
@@ -306,25 +309,14 @@ const loginUser = asyncHandler(async (req, res) => {
   // Verificamos si el usuario existe y también su password
   const user = await User.findOne({ email })
   if (user && user.isActive && (await bcrypt.compare(password, user.password))) {
-    // Generamos un token si y solo si el usuario está verificado
-    if (user.isVerified) {
-      res.status(200).json({
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        isVerified: user.isVerified,
-        isAdmin: user.isAdmin,
-        token: generateToken(user.id, user.tokenVersion)
-      })
-    } else {
-      res.status(200).json({
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        isVerified: user.isVerified,
-        isAdmin: user.isAdmin
-      })
-    }
+    res.status(200).json({
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      isVerified: user.isVerified,
+      isAdmin: user.isAdmin,
+      token: generateToken(user.id, user.tokenVersion)
+    })
   } else {
     res.status(400)
     throw new Error('Credenciales incorrectas')
