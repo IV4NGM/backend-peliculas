@@ -348,6 +348,42 @@ const getAllUsers = asyncHandler(async (req, res) => {
   }
 })
 
+const updatePassword = asyncHandler(async (req, res) => {
+  const { password, newPassword, logout } = req.body
+  if (!password || !newPassword) {
+    res.status(400)
+    throw new Error('Debes ingresar todos los campos')
+  }
+
+  const user = await User.findById(req.user._id)
+
+  if (await bcrypt.compare(password, user.password)) {
+    const newTokenVersion = logout === 'false' ? user.tokenVersion : user.tokenVersion + 1
+    const salt = await bcrypt.genSalt(10)
+    const newHashedPassword = await bcrypt.hash(newPassword, salt)
+
+    const userUpdated = await User.findByIdAndUpdate(req.user.id, {
+      password: newHashedPassword,
+      tokenVersion: newTokenVersion
+    }, { new: true })
+    if (userUpdated) {
+      res.status(200).json({
+        _id: userUpdated.id,
+        name: userUpdated.name,
+        email: userUpdated.email,
+        isAdmin: userUpdated.isAdmin,
+        logout: logout !== 'false'
+      })
+    } else {
+      res.status(400)
+      throw new Error('No se pudo actualizar la contraseña')
+    }
+  } else {
+    res.status(400)
+    throw new Error('Contraseña incorrecta')
+  }
+})
+
 const updateUser = asyncHandler(async (req, res) => {
   const { name, password, isAdmin, logout } = req.body
   if (!name && !password && !isAdmin) {
@@ -436,6 +472,7 @@ module.exports = {
   loginUser,
   getUser,
   getAllUsers,
+  updatePassword,
   updateUser,
   deleteUser
 }
