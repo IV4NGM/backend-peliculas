@@ -2,10 +2,10 @@
   "name": "backend-peliculas",
   "version": "1.0.0",
   "description": "Backend con Express y NodeJS",
-  "main": "server.js",
+  "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "server": "nodemon backend/server.js"
+    "server": "node backend/server.js"
   },
   "author": "Ivan G M",
   "license": "ISC",
